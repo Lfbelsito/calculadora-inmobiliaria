@@ -37,7 +37,7 @@ def generar_pdf(datos, rol, total_final, mni_val):
     
     try:
         # LOGO AJUSTADO: Se cambió y=10 a y=5 para subirlo en el encabezado
-        pdf.image("logo_completo.png", x=65, y=5, w=80) 
+        pdf.image("logo_completo.png", x=65, y=3, w=80) 
     except:
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", "B", 16)
