@@ -31,41 +31,43 @@ def generar_pdf(datos, rol, total_final, mni_val):
     pdf = FPDF()
     pdf.add_page()
     
-    # Encabezado Institucional
+    # Encabezado Institucional (Bloque Verde)
     pdf.set_fill_color(11, 61, 46) 
     pdf.rect(0, 0, 210, 45, 'F') 
     
     try:
-        pdf.image("logo_completo.png", x=65, y=10, w=80) 
+        # LOGO AJUSTADO: Se cambió y=10 a y=5 para subirlo en el encabezado
+        pdf.image("logo_completo.png", x=65, y=5, w=80) 
     except:
         pdf.set_text_color(255, 255, 255)
-        pdf.set_font("Arial", "B", 16)
+        pdf.set_font("Helvetica", "B", 16)
         pdf.text(65, 25, "LLAMEDO PROPIEDADES")
 
-    # Cuerpo - Margen de seguridad para evitar solapamiento
+    # Cuerpo - Iniciamos el texto por debajo del bloque verde (y=55)
     pdf.set_y(55) 
     pdf.set_text_color(11, 61, 46)
-    pdf.set_font("Arial", "B", 12)
+    pdf.set_font("Helvetica", "B", 12)
+    # Título centrado y limpio
     pdf.cell(0, 10, f"SIMULACIÓN DE GASTOS ESTIMADOS - PARTE {rol.upper()}", ln=True, align="C")
     pdf.ln(5)
     
     # Información de la Propiedad
     pdf.set_text_color(0, 0, 0)
-    pdf.set_font("Arial", "B", 10)
+    pdf.set_font("Helvetica", "B", 10)
     pdf.cell(0, 6, f"Referencia: {datos['direccion']} {datos['unidad']}", ln=True)
-    pdf.set_font("Arial", "", 10)
+    pdf.set_font("Helvetica", "", 10)
     pdf.cell(0, 6, f"Valor Real de Transacción: USD {datos['p_real']:,.2f}", ln=True)
     pdf.cell(0, 6, f"Valor de Escrituración: USD {datos['p_esc']:,.2f}", ln=True)
     pdf.ln(8)
     
     # Tabla de Gastos
-    pdf.set_font("Arial", "B", 9)
+    pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(245, 243, 235) 
     pdf.cell(85, 9, " Concepto", 1, 0, 'L', True)
     pdf.cell(45, 9, "Monto (USD)", 1, 0, 'C', True)
     pdf.cell(60, 9, " Base Imponible", 1, 1, 'L', True)
     
-    pdf.set_font("Arial", "", 9)
+    pdf.set_font("Helvetica", "", 9)
     for item in datos['detalle']:
         pdf.cell(85, 8, f" {item[0]}", 1)
         pdf.cell(45, 8, f"{item[1]}", 1, 0, 'R')
@@ -73,17 +75,17 @@ def generar_pdf(datos, rol, total_final, mni_val):
     
     # Resultado Destacado
     pdf.ln(8)
-    pdf.set_font("Arial", "B", 11)
+    pdf.set_font("Helvetica", "B", 11)
     pdf.set_text_color(11, 61, 46)
     label = "NETO A RECIBIR" if rol == "Vendedor" else "TOTAL A DESEMBOLSAR"
     pdf.cell(0, 10, f"{label}: USD {total_final:,.2f}", ln=True, align="R")
     
-    # DISCLAIMER DE NO VINCULACIÓN (Resaltado)
+    # DISCLAIMER DE NO VINCULACIÓN
     pdf.set_y(245)
-    pdf.set_font("Arial", "B", 8)
+    pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(0, 5, "DOCUMENTO NO VINCULANTE", ln=True, align="C")
-    pdf.set_font("Arial", "I", 8)
+    pdf.set_font("Helvetica", "I", 8)
     pdf.multi_cell(0, 4, txt="Esta simulación de gastos se emite con fines meramente orientativos e informativos. "
                              "No constituye una oferta, compromiso ni asesoramiento legal o contable. "
                              "Los valores definitivos surgirán de las proformas oficiales de los escribanos "
@@ -102,7 +104,7 @@ with st.sidebar:
         pass
     st.markdown("---")
     tc = st.number_input("Dólar (ARS)", value=1415)
-    mni = st.number_input("MNI Sellos CABA (ARS)", value=226100000)
+    mni = st.number_input("Tope Sellos CABA (ARS)", value=226100000)
 
 st.subheader("Datos de la Operación")
 col_p1, col_p2 = st.columns([3, 1])
