@@ -8,24 +8,34 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # 1. FUNCIÓN DE CONEXIÓN AL BCRA (Dólar Oficial Minorista Vendedor)
 def obtener_dolar_bcra():
+    # Valor por defecto si todo falla (el que tenías hoy)
+    fallback_val = 1414.02
+    fallback_fecha = "20/03/2026"
+    
     try:
-        # Endpoint oficial Variable 4
         url = "https://api.bcra.gob.ar/estadisticas/v4.0/monetarias/4"
-        # Cabecera para simular un navegador real y evitar bloqueos
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'application/json'
         }
-        response = requests.get(url, headers=headers, verify=False, timeout=12)
+        response = requests.get(url, headers=headers, verify=False, timeout=10)
         
         if response.status_code == 200:
             datos = response.json()
+            # Verificamos que 'results' exista y no esté vacío
             if 'results' in datos and len(datos['results']) > 0:
                 ultimo = datos['results'][-1]
-                return float(ultimo['valor']), ultimo['fecha'], "Conexión Exitosa"
+                # Verificamos que la llave 'valor' realmente exista en el registro
+                if 'valor' in ultimo:
+                    return float(ultimo['valor']), ultimo.get('fecha', fallback_fecha), "Conexión Exitosa"
+                else:
+                    return fallback_val, fallback_fecha, "Dato 'valor' no encontrado en BCRA"
+            else:
+                return fallback_val, fallback_fecha, "BCRA no devolvió resultados hoy"
     except Exception as e:
-        return 1414.02, "20/03/2026", f"Error de conexión: {str(e)}"
-    return 1414.02, "20/03/2026", "Servidor BCRA no disponible"
+        return fallback_val, fallback_fecha, f"Error de conexión: {str(e)}"
+    
+    return fallback_val, fallback_fecha, "Error desconocido"
 
 # 2. CONFIGURACIÓN E IDENTIDAD VISUAL (FIX DARK MODE)
 st.set_page_config(page_title="Simulador Llamedo - Profesional", page_icon="🏠")
