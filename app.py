@@ -2,24 +2,23 @@ import streamlit as st
 import requests
 from fpdf import FPDF
 
-# 1. OBTENCIÓN AUTOMÁTICA DEL DÓLAR (BCRA VARIABLE ID 4)
+# 1. FUNCIÓN DE CONEXIÓN AL BCRA (ID 4 - MINORISTA VENDEDOR)
 def obtener_dolar_bcra():
     try:
-        # Endpoint para Tipo de Cambio Minorista Promedio Vendedor - Com. B 9791
         url = "https://api.bcra.gob.ar/estadisticas/v4.0/monetarias/4"
-        response = requests.get(url, verify=False, timeout=5)
+        headers = {'User-Agent': 'Mozilla/5.0'} 
+        response = requests.get(url, headers=headers, verify=False, timeout=8)
         if response.status_code == 200:
             datos = response.json()
-            ultimo_registro = datos['results'][-1]
-            return float(ultimo_registro['valor'])
+            ultimo = datos['results'][-1]
+            # Devolvemos el valor y la fecha de la última actualización
+            return float(ultimo['valor']), ultimo['fecha']
     except Exception:
-        return 1415.0 # Valor de respaldo en caso de error de conexión
-    return 1415.0
+        return 1414.02, "20/03/2026" # Fallback basado en tu última captura
+    return 1414.02, "20/03/2026"
 
-# 2. CONFIGURACIÓN E IDENTIDAD VISUAL (VERDE BOSQUE & CREMA)
+# 2. CONFIGURACIÓN E IDENTIDAD VISUAL LLAMEDO PROPIEDADES
 st.set_page_config(page_title="Llamedo Propiedades - Simulador", page_icon="🏠")
-
-cotizacion_bcra = obtener_dolar_bcra()
 
 st.markdown("""
     <style>
@@ -27,43 +26,23 @@ st.markdown("""
     h1, h2, h3 { color: #0B3D2E !important; font-family: 'Georgia', serif; }
     [data-testid="stSidebar"] { background-color: #0B3D2E; }
     [data-testid="stSidebar"] label { color: white !important; }
-    /* Estilo para los inputs de la barra lateral */
-    [data-testid="stSidebar"] input { 
-        color: #0B3D2E !important; 
-        background-color: white !important; 
-    }
-    /* Estilo para el input deshabilitado */
+    [data-testid="stSidebar"] input { color: #0B3D2E !important; background-color: white !important; }
     [data-testid="stSidebar"] .stNumberInput div[data-baseweb="input"] input:disabled {
         -webkit-text-fill-color: #0B3D2E !important;
-        opacity: 0.8;
+        opacity: 0.7;
     }
-    .stButton>button { 
-        background-color: #0B3D2E; 
-        color: white !important; 
-        border-radius: 4px; 
-        font-weight: bold;
-        width: 100%;
-    }
-    [data-testid="stMetric"] {
-        background-color: #ffffff;
-        border-left: 5px solid #0B3D2E;
-        padding: 20px;
-        border-radius: 8px;
-    }
+    .stButton>button { background-color: #0B3D2E; color: white !important; border-radius: 4px; font-weight: bold; }
+    [data-testid="stMetric"] { background-color: #ffffff; border-left: 5px solid #0B3D2E; padding: 20px; border-radius: 8px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. GENERACIÓN DE PDF (ESTILO INSTITUCIONAL NO VINCULANTE)
+# 3. GENERACIÓN DE PDF PROFESIONAL (AJUSTADO)
 def generar_pdf(datos, rol, total_final, mni_val):
     pdf = FPDF()
     pdf.add_page()
-    
-    # Bloque Verde Superior
     pdf.set_fill_color(11, 61, 46) 
     pdf.rect(0, 0, 210, 45, 'F') 
-    
     try:
-        # Logo posicionado en la parte superior del encabezado
         pdf.image("logo_completo.png", x=65, y=5, w=80) 
     except:
         pdf.set_text_color(255, 255, 255)
@@ -76,7 +55,6 @@ def generar_pdf(datos, rol, total_final, mni_val):
     pdf.cell(0, 10, f"SIMULACIÓN DE GASTOS ESTIMADOS - PARTE {rol.upper()}", ln=True, align="C")
     pdf.ln(5)
     
-    # Datos del Inmueble
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "B", 10)
     pdf.cell(0, 6, f"Referencia: {datos['direccion']} {datos['unidad']}", ln=True)
@@ -85,7 +63,6 @@ def generar_pdf(datos, rol, total_final, mni_val):
     pdf.cell(0, 6, f"Valor de Escrituración: USD {datos['p_esc']:,.2f}", ln=True)
     pdf.ln(8)
     
-    # Tabla de Gastos
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(245, 243, 235) 
     pdf.cell(85, 9, " Concepto", 1, 0, 'L', True)
@@ -104,36 +81,47 @@ def generar_pdf(datos, rol, total_final, mni_val):
     label = "NETO A RECIBIR" if rol == "Vendedor" else "TOTAL A DESEMBOLSAR"
     pdf.cell(0, 10, f"{label}: USD {total_final:,.2f}", ln=True, align="R")
     
-    # Disclaimer No Vinculante
     pdf.set_y(245)
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(0, 5, "DOCUMENTO NO VINCULANTE", ln=True, align="C")
     pdf.set_font("Helvetica", "I", 8)
-    pdf.multi_cell(0, 4, txt="Esta simulación se emite con fines orientativos. Fuente cotización: BCRA oficial. "
+    pdf.multi_cell(0, 4, txt="Esta simulación se emite con fines orientativos. "
                              "Los valores definitivos surgirán de las proformas oficiales de los escribanos "
                              "intervinientes y de las liquidaciones finales de impuestos vigentes al momento de la firma.", 
                    align="C")
-    
     return bytes(pdf.output())
 
-# 4. INTERFAZ DE USUARIO
-st.title("💼 Simulador de Gastos Inmobiliarios")
+# 4. LÓGICA DE INTERFAZ
+st.title("💼 Simulador de Gastos")
 
+# Sidebar: Control de Cotización
 with st.sidebar:
     try:
         st.image("logo_completo.png", use_container_width=True)
     except:
         pass
     st.markdown("---")
-    # Campo deshabilitado para que no sea editable por el usuario
-    tc = st.number_input("Dólar (ARS) - Fuente: BCRA", value=cotizacion_bcra, disabled=True)
+    
+    # Lógica de Selección de Dólar
+    fuente_dolar = st.radio("Fuente del Tipo de Cambio:", ["Oficial BCRA", "Manual / Especulativo"])
+    
+    val_bcra, fecha_bcra = obtener_dolar_bcra()
+    
+    if fuente_dolar == "Oficial BCRA":
+        st.caption(f"Última actualización: {fecha_bcra}")
+        tc = st.number_input("Dólar (ARS)", value=val_bcra, disabled=True)
+    else:
+        st.caption("Modo edición manual habilitado")
+        tc = st.number_input("Dólar (ARS)", value=val_bcra, disabled=False, step=1.0)
+    
     mni = st.number_input("Tope Sellos CABA (ARS)", value=226100000)
 
+# Inputs de la Propiedad
 st.subheader("Datos de la Operación")
 c_p1, c_p2 = st.columns([3, 1])
 with c_p1:
-    direccion = st.text_input("Ubicación del Inmueble", "Propiedad en CABA")
+    direccion = st.text_input("Ubicación", "Propiedad en CABA")
 with c_p2:
     unidad = st.text_input("Unidad", "Piso/Depto")
 
@@ -147,7 +135,7 @@ with col2:
     p_esc = st.number_input("Precio de Escrituración (USD)", value=80000.0)
     esc_pct = st.number_input("% Honorarios Escribano", value=2.0)
 
-# Cálculos de Gastos
+# Cálculos Finales
 comision = p_real * (com_pct / 100)
 iva_com = comision * 0.21
 hono_esc = p_esc * (esc_pct / 100)
@@ -169,6 +157,7 @@ resultado = (p_real - total_gastos) if rol == "Vendedor" else (p_real + total_ga
 st.divider()
 st.metric(f"RESULTADO ESTIMADO PARA {rol.upper()}", f"USD {resultado:,.2f}")
 
+# Datos para el PDF
 datos_pdf = {
     'direccion': direccion, 'unidad': unidad,
     'p_real': p_real, 'p_esc': p_esc,
@@ -190,4 +179,4 @@ try:
         mime="application/pdf"
     )
 except Exception as e:
-    st.error(f"Error al generar el documento: {e}")
+    st.error(f"Error técnico: {e}")
