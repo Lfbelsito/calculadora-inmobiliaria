@@ -11,32 +11,68 @@ def obtener_dolar_bcra():
         if response.status_code == 200:
             datos = response.json()
             ultimo = datos['results'][-1]
-            # Devolvemos el valor y la fecha de la última actualización
             return float(ultimo['valor']), ultimo['fecha']
     except Exception:
-        return 1414.02, "20/03/2026" # Fallback basado en tu última captura
+        return 1414.02, "20/03/2026" 
     return 1414.02, "20/03/2026"
 
 # 2. CONFIGURACIÓN E IDENTIDAD VISUAL LLAMEDO PROPIEDADES
 st.set_page_config(page_title="Llamedo Propiedades - Simulador", page_icon="🏠")
 
+# --- CSS MEJORADO PARA VISIBILIDAD TOTAL ---
 st.markdown("""
     <style>
+    /* Fondo general en tono Crema suave */
     .stApp { background-color: #F9F7F2; }
+    
+    /* Títulos en Verde Oscuro */
     h1, h2, h3 { color: #0B3D2E !important; font-family: 'Georgia', serif; }
+    
+    /* Sidebar en Verde Oscuro */
     [data-testid="stSidebar"] { background-color: #0B3D2E; }
-    [data-testid="stSidebar"] label { color: white !important; }
-    [data-testid="stSidebar"] input { color: #0B3D2E !important; background-color: white !important; }
-    [data-testid="stSidebar"] .stNumberInput div[data-baseweb="input"] input:disabled {
-        -webkit-text-fill-color: #0B3D2E !important;
-        opacity: 0.7;
+    
+    /* TODO el texto de la barra lateral en blanco (etiquetas, radio buttons, captions) */
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] .stCaption, 
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] span,
+    [data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] p { 
+        color: white !important; 
     }
-    .stButton>button { background-color: #0B3D2E; color: white !important; border-radius: 4px; font-weight: bold; }
-    [data-testid="stMetric"] { background-color: #ffffff; border-left: 5px solid #0B3D2E; padding: 20px; border-radius: 8px; }
+    
+    /* TEXTO DENTRO DE LOS INPUTS (Verde oscuro sobre fondo blanco) */
+    [data-testid="stSidebar"] input { 
+        color: #0B3D2E !important; 
+        background-color: white !important;
+        -webkit-text-fill-color: #0B3D2E !important;
+    }
+    
+    /* Estilo específico para input deshabilitado */
+    [data-testid="stSidebar"] .stNumberInput div[data-baseweb="input"] input:disabled {
+        opacity: 0.9;
+    }
+
+    /* Botón de descarga en Verde Llamedo */
+    .stButton>button { 
+        background-color: #0B3D2E; 
+        color: white !important; 
+        border-radius: 4px; 
+        font-weight: bold;
+        width: 100%;
+        border: none;
+    }
+    
+    /* Tarjetas de métricas */
+    [data-testid="stMetric"] {
+        background-color: #ffffff;
+        border-left: 5px solid #0B3D2E;
+        padding: 20px;
+        border-radius: 8px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. GENERACIÓN DE PDF PROFESIONAL (AJUSTADO)
+# 3. GENERACIÓN DE PDF PROFESIONAL (DISEÑO LIMPIO)
 def generar_pdf(datos, rol, total_final, mni_val):
     pdf = FPDF()
     pdf.add_page()
@@ -103,7 +139,7 @@ with st.sidebar:
         pass
     st.markdown("---")
     
-    # Lógica de Selección de Dólar
+    # Fuente del Dólar
     fuente_dolar = st.radio("Fuente del Tipo de Cambio:", ["Oficial BCRA", "Manual / Especulativo"])
     
     val_bcra, fecha_bcra = obtener_dolar_bcra()
