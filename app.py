@@ -57,11 +57,24 @@ def calcular_operacion(p_real, p_esc, com_pct, esc_pct, tipo, tc, mni):
         'sellos': sellos_parte_usd, 'total_gastos': total_gastos
     }
 
-# 4. GENERACIÓN DE PDF MULTI-PÁGINA CON RESUMEN COMPARATIVO
+# 4. FUNCIÓN PARA AGREGAR EL DISCLAIMER EN CADA HOJA
+def agregar_disclaimer(pdf):
+    pdf.set_y(245)
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_text_color(100, 100, 100)
+    pdf.cell(0, 5, "DOCUMENTO NO VINCULANTE", ln=True, align="C")
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.multi_cell(0, 4, txt="Esta simulación de gastos se emite con fines orientativos e informativos. "
+                             "No constituye una oferta, compromiso ni asesoramiento profesional. "
+                             "Los valores definitivos surgirán de las proformas oficiales de los escribanos "
+                             "intervinientes y de las liquidaciones finales de impuestos vigentes al momento de la firma.", 
+                   align="C")
+
+# 5. GENERACIÓN DE PDF MULTI-PÁGINA
 def generar_pdf_comparativo(casos, tc, mni_val):
     pdf = FPDF()
     
-    # Páginas de Detalle (Caso A y Caso B)
+    # Páginas de Detalle (Escenarios A y B)
     for caso in casos:
         pdf.add_page()
         pdf.set_fill_color(11, 61, 46) 
@@ -84,9 +97,10 @@ def generar_pdf_comparativo(casos, tc, mni_val):
         pdf.cell(0, 6, f"Referencia: {caso['direccion']} {caso['unidad']}", ln=True)
         pdf.set_font("Helvetica", "", 10)
         pdf.cell(0, 6, f"Precio Real: USD {caso['p_real']:,.2f} | Precio Escritura: USD {caso['p_esc']:,.2f}", ln=True)
-        pdf.cell(0, 6, f"Categoria: {caso['tipo']}", ln=True)
+        pdf.cell(0, 6, f"Categoría: {caso['tipo']}", ln=True)
         pdf.ln(8)
         
+        # Tabla Detallada
         pdf.set_font("Helvetica", "B", 9)
         pdf.set_fill_color(245, 243, 235) 
         pdf.cell(85, 9, " Concepto", 1, 0, 'L', True)
@@ -97,8 +111,8 @@ def generar_pdf_comparativo(casos, tc, mni_val):
         items = [
             ["Honorarios Inmobiliarios", f"{caso['res']['comision']:,.2f}", "Sobre Valor Real"],
             ["IVA s/ Honorarios", f"{caso['res']['iva_com']:,.2f}", "21% Profesional"],
-            ["Honorarios Escribania", f"{caso['res']['hono_esc']:,.2f}", "Sobre Escritura"],
-            ["IVA s/ Escribania", f"{caso['res']['iva_esc']:,.2f}", "21% Profesional"],
+            ["Honorarios Escribanía", f"{caso['res']['hono_esc']:,.2f}", "Sobre Escritura"],
+            ["IVA s/ Escribanía", f"{caso['res']['iva_esc']:,.2f}", "21% Profesional"],
             ["Impuesto de Sellos (50%)", f"{caso['res']['sellos']:,.2f}", "Ley CABA 2026"]
         ]
         for item in items:
@@ -112,14 +126,16 @@ def generar_pdf_comparativo(casos, tc, mni_val):
         res_label = "NETO A RECIBIR" if caso['rol'] == "Vendedor" else "TOTAL A PAGAR"
         final_val = (caso['p_real'] - caso['res']['total_gastos']) if caso['rol'] == "Vendedor" else (caso['p_real'] + caso['res']['total_gastos'])
         pdf.cell(0, 10, f"{res_label}: USD {final_val:,.2f}", ln=True, align="R")
+        
+        # AGREGAR DISCLAIMER EN ESTA HOJA
+        agregar_disclaimer(pdf)
 
-    # --- PÁGINA 3: RESUMEN COMPARATIVO (Solo si hay más de 1 caso) ---
+    # Página de Resumen Comparativo (Solo si Caso B existe)
     if len(casos) > 1:
         pdf.add_page()
         pdf.set_fill_color(11, 61, 46) 
         pdf.rect(0, 0, 210, 45, 'F') 
-        try:
-            pdf.image("logo_completo.png", x=65, y=5, w=80) 
+        try: pdf.image("logo_completo.png", x=65, y=5, w=80) 
         except: pass
 
         pdf.set_y(55)
@@ -128,7 +144,6 @@ def generar_pdf_comparativo(casos, tc, mni_val):
         pdf.cell(0, 15, "RESUMEN COMPARATIVO DE ESCENARIOS", ln=True, align="C")
         pdf.ln(10)
 
-        # Tabla Comparativa
         pdf.set_font("Helvetica", "B", 10)
         pdf.set_fill_color(245, 243, 235)
         pdf.cell(70, 12, "Concepto", 1, 0, 'C', True)
@@ -138,46 +153,37 @@ def generar_pdf_comparativo(casos, tc, mni_val):
         pdf.set_font("Helvetica", "", 10)
         pdf.set_text_color(0, 0, 0)
         
+        val_a = (casos[0]['p_real'] - casos[0]['res']['total_gastos']) if casos[0]['rol'] == "Vendedor" else (casos[0]['p_real'] + casos[0]['res']['total_gastos'])
+        val_b = (casos[1]['p_real'] - casos[1]['res']['total_gastos']) if casos[1]['rol'] == "Vendedor" else (casos[1]['p_real'] + casos[1]['res']['total_gastos'])
+
         filas = [
             ["Precio Real (USD)", f"{casos[0]['p_real']:,.2f}", f"{casos[1]['p_real']:,.2f}"],
             ["Precio Escritura (USD)", f"{casos[0]['p_esc']:,.2f}", f"{casos[1]['p_esc']:,.2f}"],
             ["Categoría", casos[0]['tipo'], casos[1]['tipo']],
-            ["Total Gastos (USD)", f"{casos[0]['res']['total_gastos']:,.2f}", f"{casos[1]['res']['total_gastos']:,.2f}"]
+            ["Total Gastos (USD)", f"{casos[0]['res']['total_gastos']:,.2f}", f"{casos[1]['res']['total_gastos']:,.2f}"],
+            ["RESULTADO FINAL", f"USD {val_a:,.2f}", f"USD {val_b:,.2f}"]
         ]
         
-        for fila in filas:
+        for i, fila in enumerate(filas):
+            if i == len(filas) - 1: # Resaltar la última fila
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.set_text_color(11, 61, 46)
             pdf.cell(70, 10, fila[0], 1)
             pdf.cell(60, 10, fila[1], 1, 0, 'C')
             pdf.cell(60, 10, fila[2], 1, 1, 'C')
 
-        # Resultado Final Destacado
-        pdf.ln(10)
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.set_text_color(11, 61, 46)
-        label_a = "NETO A" if casos[0]['rol'] == "Vendedor" else "TOTAL A"
-        val_a = (casos[0]['p_real'] - casos[0]['res']['total_gastos']) if casos[0]['rol'] == "Vendedor" else (casos[0]['p_real'] + casos[0]['res']['total_gastos'])
-        val_b = (casos[1]['p_real'] - casos[1]['res']['total_gastos']) if casos[1]['rol'] == "Vendedor" else (casos[1]['p_real'] + casos[1]['res']['total_gastos'])
-        
-        pdf.cell(70, 12, "RESULTADO FINAL", 1)
-        pdf.cell(60, 12, f"USD {val_a:,.2f}", 1, 0, 'C')
-        pdf.cell(60, 12, f"USD {val_b:,.2f}", 1, 1, 'C')
-
-    # Footer común
-    pdf.set_y(260)
-    pdf.set_font("Helvetica", "I", 8)
-    pdf.set_text_color(100, 100, 100)
-    pdf.multi_cell(0, 4, txt="SIMULACION NO VINCULANTE. Documento generado para analisis comparativo de Llamedo Propiedades. "
-                             "Los valores definitivos seran provistos por escribania mediante proforma.", align="C")
+        # AGREGAR DISCLAIMER EN ESTA HOJA TAMBIÉN
+        agregar_disclaimer(pdf)
     
     return bytes(pdf.output())
 
-# 5. INTERFAZ DE USUARIO
+# 6. INTERFAZ DE USUARIO
 st.title("💼 Simulador de Escenarios")
 
 with st.sidebar:
     st.image("logo_completo.png", use_container_width=True)
     st.markdown("---")
-    fuente_dolar = st.radio("Dolar:", ["Oficial BCRA", "Manual"])
+    fuente_dolar = st.radio("Cotización Dólar:", ["Oficial BCRA", "Manual"])
     val_bcra, fecha_bcra = obtener_dolar_bcra()
     tc = st.number_input("Valor USD", value=val_bcra, disabled=(fuente_dolar=="Oficial BCRA"))
     mni = st.number_input("Tope Sellos CABA (ARS)", value=226100000)
@@ -185,13 +191,13 @@ with st.sidebar:
 # ESCENARIO A
 st.header("📍 Escenario A")
 c_a1, c_a2 = st.columns([3, 1])
-dir_a = c_a1.text_input("Direccion (Caso A)", "Propiedad Ejemplo")
+dir_a = c_a1.text_input("Dirección (A)", "Propiedad Ejemplo")
 uni_a = c_a2.text_input("Unidad (A)", "Piso/Depto")
 
 col_a1, col_a2 = st.columns(2)
 rol_a = col_a1.selectbox("Rol (A)", ["Vendedor", "Comprador"], key="rol_a")
 p_real_a = col_a1.number_input("Precio Real (A)", value=100000.0, key="pr_a")
-com_a = col_a1.number_input("% Comision (A)", value=3.0, key="c_a")
+com_a = col_a1.number_input("% Comisión (A)", value=3.0, key="c_a")
 tipo_a = col_a2.selectbox("Tipo (A)", ["Primera Vivienda", "Segunda Vivienda", "Inversion"], key="t_a")
 p_esc_a = col_a2.number_input("Precio Escritura (A)", value=80000.0, key="pe_a")
 esc_a = col_a2.number_input("% Escribano (A)", value=2.0, key="e_a")
@@ -211,13 +217,13 @@ if st.session_state.mostrar_caso_b:
     st.divider()
     st.header("📍 Escenario B")
     c_b1, c_b2 = st.columns([3, 1])
-    dir_b = c_b1.text_input("Direccion (Caso B)", dir_a)
+    dir_b = c_b1.text_input("Dirección (B)", dir_a)
     uni_b = c_b2.text_input("Unidad (B)", uni_a)
     
     col_b1, col_b2 = st.columns(2)
     rol_b = col_b1.selectbox("Rol (B)", ["Vendedor", "Comprador"], key="rol_b")
     p_real_b = col_b1.number_input("Precio Real (B)", value=p_real_a, key="pr_b")
-    com_b = col_b1.number_input("% Comision (B)", value=com_a, key="c_b")
+    com_b = col_b1.number_input("% Comisión (B)", value=com_a, key="c_b")
     tipo_b = col_b2.selectbox("Tipo (B)", ["Primera Vivienda", "Segunda Vivienda", "Inversion"], index=1, key="t_b")
     p_esc_b = col_b2.number_input("Precio Escritura (B)", value=p_esc_a, key="pe_b")
     esc_b = col_b2.number_input("% Escribano (B)", value=esc_a, key="e_b")
@@ -232,15 +238,15 @@ if st.session_state.mostrar_caso_b:
 
 st.divider()
 m1, m2 = st.columns(2)
-m1.metric(f"Neto A ({rol_a})", f"USD {final_a:,.2f}")
+m1.metric(f"Resultado A", f"USD {final_a:,.2f}")
 if st.session_state.mostrar_caso_b:
-    m2.metric(f"Neto B ({rol_b})", f"USD {final_b:,.2f}")
+    m2.metric(f"Resultado B", f"USD {final_b:,.2f}")
 
-# EXPORTAR PDF (1, 2 o 3 páginas según corresponda)
+# EXPORTAR PDF COMPLETO
 pdf_bytes = generar_pdf_comparativo(lista_casos, tc, mni)
 st.download_button(
-    label="📄 Descargar Informe Comparativo (PDF)",
+    label="📄 Descargar Informe Comparativo Completo (PDF)",
     data=pdf_bytes,
-    file_name="Comparativa_Llamedo_Propiedades.pdf",
+    file_name="Simulacion_Gastos_Llamedo.pdf",
     mime="application/pdf"
 )
