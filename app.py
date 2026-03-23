@@ -2,26 +2,24 @@ import streamlit as st
 import requests
 from fpdf import FPDF
 
-# 1. FUNCIÓN PARA OBTENER COTIZACIÓN DEL BCRA
+# 1. OBTENCIÓN AUTOMÁTICA DEL DÓLAR (BCRA VARIABLE ID 4)
 def obtener_dolar_bcra():
     try:
-        # Endpoint oficial del BCRA para la variable 4 (Dólar Minorista Vendedor)
+        # Endpoint para Tipo de Cambio Minorista Promedio Vendedor - Com. B 9791
         url = "https://api.bcra.gob.ar/estadisticas/v4.0/monetarias/4"
-        response = requests.get(url, verify=False, timeout=5) # verify=False por posibles temas de certificados del BCRA
+        response = requests.get(url, verify=False, timeout=5)
         if response.status_code == 200:
             datos = response.json()
-            # Tomamos el último valor de la lista (el más reciente)
             ultimo_registro = datos['results'][-1]
             return float(ultimo_registro['valor'])
     except Exception:
-        return 1415.0  # Valor de respaldo (fallback) si falla la conexión
+        return 1415.0 # Valor de respaldo en caso de error de conexión
     return 1415.0
 
-# 2. CONFIGURACIÓN E IDENTIDAD VISUAL
+# 2. CONFIGURACIÓN E IDENTIDAD VISUAL (VERDE BOSQUE & CREMA)
 st.set_page_config(page_title="Llamedo Propiedades - Simulador", page_icon="🏠")
 
-# Obtenemos la cotización actual antes de renderizar
-cotizacion_hoy = obtener_dolar_bcra()
+cotizacion_bcra = obtener_dolar_bcra()
 
 st.markdown("""
     <style>
@@ -29,31 +27,56 @@ st.markdown("""
     h1, h2, h3 { color: #0B3D2E !important; font-family: 'Georgia', serif; }
     [data-testid="stSidebar"] { background-color: #0B3D2E; }
     [data-testid="stSidebar"] label { color: white !important; }
-    [data-testid="stSidebar"] input { color: #0B3D2E !important; background-color: white !important; }
-    .stButton>button { background-color: #0B3D2E; color: white !important; border-radius: 4px; font-weight: bold; }
-    [data-testid="stMetric"] { background-color: #ffffff; border-left: 5px solid #0B3D2E; padding: 20px; border-radius: 8px; }
+    /* Estilo para los inputs de la barra lateral */
+    [data-testid="stSidebar"] input { 
+        color: #0B3D2E !important; 
+        background-color: white !important; 
+    }
+    /* Estilo para el input deshabilitado */
+    [data-testid="stSidebar"] .stNumberInput div[data-baseweb="input"] input:disabled {
+        -webkit-text-fill-color: #0B3D2E !important;
+        opacity: 0.8;
+    }
+    .stButton>button { 
+        background-color: #0B3D2E; 
+        color: white !important; 
+        border-radius: 4px; 
+        font-weight: bold;
+        width: 100%;
+    }
+    [data-testid="stMetric"] {
+        background-color: #ffffff;
+        border-left: 5px solid #0B3D2E;
+        padding: 20px;
+        border-radius: 8px;
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. GENERACIÓN DE PDF (Sin cambios significativos en la lógica)
+# 3. GENERACIÓN DE PDF (ESTILO INSTITUCIONAL NO VINCULANTE)
 def generar_pdf(datos, rol, total_final, mni_val):
     pdf = FPDF()
     pdf.add_page()
+    
+    # Bloque Verde Superior
     pdf.set_fill_color(11, 61, 46) 
     pdf.rect(0, 0, 210, 45, 'F') 
+    
     try:
+        # Logo posicionado en la parte superior del encabezado
         pdf.image("logo_completo.png", x=65, y=5, w=80) 
     except:
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", "B", 16)
         pdf.text(65, 25, "LLAMEDO PROPIEDADES")
-    
+
     pdf.set_y(55) 
     pdf.set_text_color(11, 61, 46)
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 10, f"SIMULACIÓN DE GASTOS ESTIMADOS - PARTE {rol.upper()}", ln=True, align="C")
     pdf.ln(5)
     
+    # Datos del Inmueble
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "B", 10)
     pdf.cell(0, 6, f"Referencia: {datos['direccion']} {datos['unidad']}", ln=True)
@@ -62,6 +85,7 @@ def generar_pdf(datos, rol, total_final, mni_val):
     pdf.cell(0, 6, f"Valor de Escrituración: USD {datos['p_esc']:,.2f}", ln=True)
     pdf.ln(8)
     
+    # Tabla de Gastos
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(245, 243, 235) 
     pdf.cell(85, 9, " Concepto", 1, 0, 'L', True)
@@ -80,19 +104,21 @@ def generar_pdf(datos, rol, total_final, mni_val):
     label = "NETO A RECIBIR" if rol == "Vendedor" else "TOTAL A DESEMBOLSAR"
     pdf.cell(0, 10, f"{label}: USD {total_final:,.2f}", ln=True, align="R")
     
+    # Disclaimer No Vinculante
     pdf.set_y(245)
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(0, 5, "DOCUMENTO NO VINCULANTE", ln=True, align="C")
     pdf.set_font("Helvetica", "I", 8)
-    pdf.multi_cell(0, 4, txt="Esta simulación se emite con fines informativos. Fuente cotización: BCRA (ID 4). "
+    pdf.multi_cell(0, 4, txt="Esta simulación se emite con fines orientativos. Fuente cotización: BCRA oficial. "
                              "Los valores definitivos surgirán de las proformas oficiales de los escribanos "
-                             "y liquidaciones finales de impuestos vigentes al momento de la firma.", 
+                             "intervinientes y de las liquidaciones finales de impuestos vigentes al momento de la firma.", 
                    align="C")
+    
     return bytes(pdf.output())
 
-# 4. INTERFAZ Y LÓGICA
-st.title("💼 Simulador de Gastos")
+# 4. INTERFAZ DE USUARIO
+st.title("💼 Simulador de Gastos Inmobiliarios")
 
 with st.sidebar:
     try:
@@ -100,34 +126,35 @@ with st.sidebar:
     except:
         pass
     st.markdown("---")
-    # El valor por defecto ahora es lo que traemos del BCRA
-    tc = st.number_input("Dólar (ARS) - Fuente: BCRA", value=cotizacion_hoy)
+    # Campo deshabilitado para que no sea editable por el usuario
+    tc = st.number_input("Dólar (ARS) - Fuente: BCRA", value=cotizacion_bcra, disabled=True)
     mni = st.number_input("Tope Sellos CABA (ARS)", value=226100000)
 
 st.subheader("Datos de la Operación")
-col_p1, col_p2 = st.columns([3, 1])
-with col_p1:
-    direccion = st.text_input("Ubicación", "Propiedad en CABA")
-with col_p2:
+c_p1, c_p2 = st.columns([3, 1])
+with c_p1:
+    direccion = st.text_input("Ubicación del Inmueble", "Propiedad en CABA")
+with c_p2:
     unidad = st.text_input("Unidad", "Piso/Depto")
 
 col1, col2 = st.columns(2)
 with col1:
-    rol = st.selectbox("Perfil", ["Vendedor", "Comprador"])
+    rol = st.selectbox("Perfil del Cliente", ["Vendedor", "Comprador"])
     p_real = st.number_input("Precio Real (USD)", value=100000.0)
     com_pct = st.number_input("% Honorarios Inmob.", value=3.0)
 with col2:
-    tipo = st.selectbox("Tipo Inmueble", ["Primera Vivienda", "Segunda Vivienda", "Inversión"])
-    p_esc = st.number_input("Precio Escritura (USD)", value=80000.0)
+    tipo = st.selectbox("Categoría del Inmueble", ["Primera Vivienda", "Segunda Vivienda", "Inversión"])
+    p_esc = st.number_input("Precio de Escrituración (USD)", value=80000.0)
     esc_pct = st.number_input("% Honorarios Escribano", value=2.0)
 
-# Cálculos (Ley CABA 2026)
+# Cálculos de Gastos
 comision = p_real * (com_pct / 100)
 iva_com = comision * 0.21
 hono_esc = p_esc * (esc_pct / 100)
 iva_esc = hono_esc * 0.21
 p_esc_pesos = p_esc * tc
 
+# Lógica Sellos CABA 2026
 if tipo == "Primera Vivienda":
     sellos_tot = max(0, (p_esc_pesos - mni) * 0.035)
 elif tipo == "Segunda Vivienda":
@@ -157,10 +184,10 @@ datos_pdf = {
 try:
     pdf_bytes = generar_pdf(datos_pdf, rol, resultado, mni)
     st.download_button(
-        label="📄 DESCARGAR SIMULACIÓN (PDF)",
+        label="📄 DESCARGAR SIMULACIÓN EN PDF",
         data=pdf_bytes,
         file_name=f"Simulacion_Gastos_{rol}.pdf",
         mime="application/pdf"
     )
 except Exception as e:
-    st.error(f"Error técnico: {e}")
+    st.error(f"Error al generar el documento: {e}")
