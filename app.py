@@ -1,8 +1,27 @@
 import streamlit as st
+import requests
 from fpdf import FPDF
 
-# 1. CONFIGURACIÓN E IDENTIDAD VISUAL
+# 1. FUNCIÓN PARA OBTENER COTIZACIÓN DEL BCRA
+def obtener_dolar_bcra():
+    try:
+        # Endpoint oficial del BCRA para la variable 4 (Dólar Minorista Vendedor)
+        url = "https://api.bcra.gob.ar/estadisticas/v4.0/monetarias/4"
+        response = requests.get(url, verify=False, timeout=5) # verify=False por posibles temas de certificados del BCRA
+        if response.status_code == 200:
+            datos = response.json()
+            # Tomamos el último valor de la lista (el más reciente)
+            ultimo_registro = datos['results'][-1]
+            return float(ultimo_registro['valor'])
+    except Exception:
+        return 1415.0  # Valor de respaldo (fallback) si falla la conexión
+    return 1415.0
+
+# 2. CONFIGURACIÓN E IDENTIDAD VISUAL
 st.set_page_config(page_title="Llamedo Propiedades - Simulador", page_icon="🏠")
+
+# Obtenemos la cotización actual antes de renderizar
+cotizacion_hoy = obtener_dolar_bcra()
 
 st.markdown("""
     <style>
@@ -11,47 +30,30 @@ st.markdown("""
     [data-testid="stSidebar"] { background-color: #0B3D2E; }
     [data-testid="stSidebar"] label { color: white !important; }
     [data-testid="stSidebar"] input { color: #0B3D2E !important; background-color: white !important; }
-    .stButton>button { 
-        background-color: #0B3D2E; 
-        color: white !important; 
-        border-radius: 4px; 
-        font-weight: bold;
-    }
-    [data-testid="stMetric"] {
-        background-color: #ffffff;
-        border-left: 5px solid #0B3D2E;
-        padding: 20px;
-        border-radius: 8px;
-    }
+    .stButton>button { background-color: #0B3D2E; color: white !important; border-radius: 4px; font-weight: bold; }
+    [data-testid="stMetric"] { background-color: #ffffff; border-left: 5px solid #0B3D2E; padding: 20px; border-radius: 8px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. GENERACIÓN DE PDF (ESTRICTAMENTE INFORMATIVO)
+# 3. GENERACIÓN DE PDF (Sin cambios significativos en la lógica)
 def generar_pdf(datos, rol, total_final, mni_val):
     pdf = FPDF()
     pdf.add_page()
-    
-    # Encabezado Institucional (Bloque Verde)
     pdf.set_fill_color(11, 61, 46) 
     pdf.rect(0, 0, 210, 45, 'F') 
-    
     try:
-        # LOGO AJUSTADO: Se cambió y=10 a y=5 para subirlo en el encabezado
-        pdf.image("logo_completo.png", x=65, y=3, w=80) 
+        pdf.image("logo_completo.png", x=65, y=5, w=80) 
     except:
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", "B", 16)
         pdf.text(65, 25, "LLAMEDO PROPIEDADES")
-
-    # Cuerpo - Iniciamos el texto por debajo del bloque verde (y=55)
+    
     pdf.set_y(55) 
     pdf.set_text_color(11, 61, 46)
     pdf.set_font("Helvetica", "B", 12)
-    # Título centrado y limpio
     pdf.cell(0, 10, f"SIMULACIÓN DE GASTOS ESTIMADOS - PARTE {rol.upper()}", ln=True, align="C")
     pdf.ln(5)
     
-    # Información de la Propiedad
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Helvetica", "B", 10)
     pdf.cell(0, 6, f"Referencia: {datos['direccion']} {datos['unidad']}", ln=True)
@@ -60,7 +62,6 @@ def generar_pdf(datos, rol, total_final, mni_val):
     pdf.cell(0, 6, f"Valor de Escrituración: USD {datos['p_esc']:,.2f}", ln=True)
     pdf.ln(8)
     
-    # Tabla de Gastos
     pdf.set_font("Helvetica", "B", 9)
     pdf.set_fill_color(245, 243, 235) 
     pdf.cell(85, 9, " Concepto", 1, 0, 'L', True)
@@ -73,28 +74,24 @@ def generar_pdf(datos, rol, total_final, mni_val):
         pdf.cell(45, 8, f"{item[1]}", 1, 0, 'R')
         pdf.cell(60, 8, f" {item[2]}", 1, 1)
     
-    # Resultado Destacado
     pdf.ln(8)
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_text_color(11, 61, 46)
     label = "NETO A RECIBIR" if rol == "Vendedor" else "TOTAL A DESEMBOLSAR"
     pdf.cell(0, 10, f"{label}: USD {total_final:,.2f}", ln=True, align="R")
     
-    # DISCLAIMER DE NO VINCULACIÓN
     pdf.set_y(245)
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_text_color(100, 100, 100)
     pdf.cell(0, 5, "DOCUMENTO NO VINCULANTE", ln=True, align="C")
     pdf.set_font("Helvetica", "I", 8)
-    pdf.multi_cell(0, 4, txt="Esta simulación de gastos se emite con fines meramente orientativos e informativos. "
-                             "No constituye una oferta, compromiso ni asesoramiento legal o contable. "
+    pdf.multi_cell(0, 4, txt="Esta simulación se emite con fines informativos. Fuente cotización: BCRA (ID 4). "
                              "Los valores definitivos surgirán de las proformas oficiales de los escribanos "
-                             "intervinientes y de las liquidaciones finales de impuestos vigentes al momento de la firma.", 
+                             "y liquidaciones finales de impuestos vigentes al momento de la firma.", 
                    align="C")
-    
     return bytes(pdf.output())
 
-# 3. INTERFAZ Y LÓGICA
+# 4. INTERFAZ Y LÓGICA
 st.title("💼 Simulador de Gastos")
 
 with st.sidebar:
@@ -103,7 +100,8 @@ with st.sidebar:
     except:
         pass
     st.markdown("---")
-    tc = st.number_input("Dólar (ARS)", value=1415)
+    # El valor por defecto ahora es lo que traemos del BCRA
+    tc = st.number_input("Dólar (ARS) - Fuente: BCRA", value=cotizacion_hoy)
     mni = st.number_input("Tope Sellos CABA (ARS)", value=226100000)
 
 st.subheader("Datos de la Operación")
