@@ -19,7 +19,6 @@ def obtener_dolar_bcra():
 # 2. CONFIGURACIÓN E IDENTIDAD VISUAL
 st.set_page_config(page_title="Simulador Comparativo Llamedo", page_icon="🏠")
 
-# Estado de la aplicación para manejar el Caso B
 if 'mostrar_caso_b' not in st.session_state:
     st.session_state.mostrar_caso_b = False
 
@@ -35,7 +34,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. LÓGICA DE CÁLCULO CENTRALIZADA
+# 3. LÓGICA DE CÁLCULO
 def calcular_operacion(p_real, p_esc, com_pct, esc_pct, tipo, tc, mni):
     comision = p_real * (com_pct / 100)
     iva_com = comision * 0.21
@@ -43,7 +42,6 @@ def calcular_operacion(p_real, p_esc, com_pct, esc_pct, tipo, tc, mni):
     iva_esc = hono_esc * 0.21
     p_esc_pesos = p_esc * tc
 
-    # Lógica Sellos CABA 2026
     if tipo == "Primera Vivienda":
         sellos_tot = max(0, (p_esc_pesos - mni) * 0.035)
     elif tipo == "Segunda Vivienda":
@@ -59,10 +57,12 @@ def calcular_operacion(p_real, p_esc, com_pct, esc_pct, tipo, tc, mni):
         'sellos': sellos_parte_usd, 'total_gastos': total_gastos
     }
 
-# 4. GENERACIÓN DE PDF MULTI-PÁGINA
+# 4. GENERACIÓN DE PDF MULTI-PÁGINA CON RESUMEN COMPARATIVO
 def generar_pdf_comparativo(casos, tc, mni_val):
     pdf = FPDF()
-    for i, caso in enumerate(casos):
+    
+    # Páginas de Detalle (Caso A y Caso B)
+    for caso in casos:
         pdf.add_page()
         pdf.set_fill_color(11, 61, 46) 
         pdf.rect(0, 0, 210, 45, 'F') 
@@ -87,7 +87,6 @@ def generar_pdf_comparativo(casos, tc, mni_val):
         pdf.cell(0, 6, f"Categoria: {caso['tipo']}", ln=True)
         pdf.ln(8)
         
-        # Tabla
         pdf.set_font("Helvetica", "B", 9)
         pdf.set_fill_color(245, 243, 235) 
         pdf.cell(85, 9, " Concepto", 1, 0, 'L', True)
@@ -113,12 +112,63 @@ def generar_pdf_comparativo(casos, tc, mni_val):
         res_label = "NETO A RECIBIR" if caso['rol'] == "Vendedor" else "TOTAL A PAGAR"
         final_val = (caso['p_real'] - caso['res']['total_gastos']) if caso['rol'] == "Vendedor" else (caso['p_real'] + caso['res']['total_gastos'])
         pdf.cell(0, 10, f"{res_label}: USD {final_val:,.2f}", ln=True, align="R")
+
+    # --- PÁGINA 3: RESUMEN COMPARATIVO (Solo si hay más de 1 caso) ---
+    if len(casos) > 1:
+        pdf.add_page()
+        pdf.set_fill_color(11, 61, 46) 
+        pdf.rect(0, 0, 210, 45, 'F') 
+        try:
+            pdf.image("logo_completo.png", x=65, y=5, w=80) 
+        except: pass
+
+        pdf.set_y(55)
+        pdf.set_text_color(11, 61, 46)
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.cell(0, 15, "RESUMEN COMPARATIVO DE ESCENARIOS", ln=True, align="C")
+        pdf.ln(10)
+
+        # Tabla Comparativa
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_fill_color(245, 243, 235)
+        pdf.cell(70, 12, "Concepto", 1, 0, 'C', True)
+        pdf.cell(60, 12, "ESCENARIO A", 1, 0, 'C', True)
+        pdf.cell(60, 12, "ESCENARIO B", 1, 1, 'C', True)
+
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(0, 0, 0)
         
-        pdf.set_y(245)
-        pdf.set_font("Helvetica", "I", 8)
-        pdf.set_text_color(100, 100, 100)
-        pdf.multi_cell(0, 4, txt="SIMULACION NO VINCULANTE. Documento generado para analisis comparativo. "
-                                 "Los valores definitivos seran provistos por escribania mediante proforma.", align="C")
+        filas = [
+            ["Precio Real (USD)", f"{casos[0]['p_real']:,.2f}", f"{casos[1]['p_real']:,.2f}"],
+            ["Precio Escritura (USD)", f"{casos[0]['p_esc']:,.2f}", f"{casos[1]['p_esc']:,.2f}"],
+            ["Categoría", casos[0]['tipo'], casos[1]['tipo']],
+            ["Total Gastos (USD)", f"{casos[0]['res']['total_gastos']:,.2f}", f"{casos[1]['res']['total_gastos']:,.2f}"]
+        ]
+        
+        for fila in filas:
+            pdf.cell(70, 10, fila[0], 1)
+            pdf.cell(60, 10, fila[1], 1, 0, 'C')
+            pdf.cell(60, 10, fila[2], 1, 1, 'C')
+
+        # Resultado Final Destacado
+        pdf.ln(10)
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.set_text_color(11, 61, 46)
+        label_a = "NETO A" if casos[0]['rol'] == "Vendedor" else "TOTAL A"
+        val_a = (casos[0]['p_real'] - casos[0]['res']['total_gastos']) if casos[0]['rol'] == "Vendedor" else (casos[0]['p_real'] + casos[0]['res']['total_gastos'])
+        val_b = (casos[1]['p_real'] - casos[1]['res']['total_gastos']) if casos[1]['rol'] == "Vendedor" else (casos[1]['p_real'] + casos[1]['res']['total_gastos'])
+        
+        pdf.cell(70, 12, "RESULTADO FINAL", 1)
+        pdf.cell(60, 12, f"USD {val_a:,.2f}", 1, 0, 'C')
+        pdf.cell(60, 12, f"USD {val_b:,.2f}", 1, 1, 'C')
+
+    # Footer común
+    pdf.set_y(260)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.set_text_color(100, 100, 100)
+    pdf.multi_cell(0, 4, txt="SIMULACION NO VINCULANTE. Documento generado para analisis comparativo de Llamedo Propiedades. "
+                             "Los valores definitivos seran provistos por escribania mediante proforma.", align="C")
+    
     return bytes(pdf.output())
 
 # 5. INTERFAZ DE USUARIO
@@ -133,7 +183,7 @@ with st.sidebar:
     mni = st.number_input("Tope Sellos CABA (ARS)", value=226100000)
 
 # ESCENARIO A
-st.header("📍 Caso A")
+st.header("📍 Escenario A")
 c_a1, c_a2 = st.columns([3, 1])
 dir_a = c_a1.text_input("Direccion (Caso A)", "Propiedad Ejemplo")
 uni_a = c_a2.text_input("Unidad (A)", "Piso/Depto")
@@ -149,18 +199,17 @@ esc_a = col_a2.number_input("% Escribano (A)", value=2.0, key="e_a")
 res_a = calcular_operacion(p_real_a, p_esc_a, com_a, esc_a, tipo_a, tc, mni)
 final_a = (p_real_a - res_a['total_gastos']) if rol_a == "Vendedor" else (p_real_a + res_a['total_gastos'])
 
-# BOTÓN PARA AGREGAR CASO B
+# CASO B
 if not st.session_state.mostrar_caso_b:
-    if st.button("➕ Agregar Escenario Comparativo (Caso B)"):
+    if st.button("➕ Comparar con Escenario B"):
         st.session_state.mostrar_caso_b = True
         st.rerun()
 
-# ESCENARIO B (Opcional)
 lista_casos = [{'nombre': 'A', 'rol': rol_a, 'p_real': p_real_a, 'p_esc': p_esc_a, 'tipo': tipo_a, 'direccion': dir_a, 'unidad': uni_a, 'res': res_a}]
 
 if st.session_state.mostrar_caso_b:
     st.divider()
-    st.header("📍 Caso B")
+    st.header("📍 Escenario B")
     c_b1, c_b2 = st.columns([3, 1])
     dir_b = c_b1.text_input("Direccion (Caso B)", dir_a)
     uni_b = c_b2.text_input("Unidad (B)", uni_a)
@@ -177,21 +226,20 @@ if st.session_state.mostrar_caso_b:
     final_b = (p_real_b - res_b['total_gastos']) if rol_b == "Vendedor" else (p_real_b + res_b['total_gastos'])
     lista_casos.append({'nombre': 'B', 'rol': rol_b, 'p_real': p_real_b, 'p_esc': p_esc_b, 'tipo': tipo_b, 'direccion': dir_b, 'unidad': uni_b, 'res': res_b})
     
-    if st.button("🗑️ Quitar Caso B"):
+    if st.button("🗑️ Eliminar Escenario B"):
         st.session_state.mostrar_caso_b = False
         st.rerun()
 
 st.divider()
-# Métricas comparativas
 m1, m2 = st.columns(2)
-m1.metric(f"Neto Caso A ({rol_a})", f"USD {final_a:,.2f}")
+m1.metric(f"Neto A ({rol_a})", f"USD {final_a:,.2f}")
 if st.session_state.mostrar_caso_b:
-    m2.metric(f"Neto Caso B ({rol_b})", f"USD {final_b:,.2f}")
+    m2.metric(f"Neto B ({rol_b})", f"USD {final_b:,.2f}")
 
-# EXPORTAR PDF
+# EXPORTAR PDF (1, 2 o 3 páginas según corresponda)
 pdf_bytes = generar_pdf_comparativo(lista_casos, tc, mni)
 st.download_button(
-    label="📄 Descargar Comparativa Completa (PDF)",
+    label="📄 Descargar Informe Comparativo (PDF)",
     data=pdf_bytes,
     file_name="Comparativa_Llamedo_Propiedades.pdf",
     mime="application/pdf"
