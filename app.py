@@ -6,7 +6,7 @@ import urllib3
 # Desactivar advertencias de certificados del BCRA
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# 1. FUNCIÓN DE CONEXIÓN AL BCRA (BLINDADA)
+# 1. FUNCIÓN DE CONEXIÓN AL BCRA (BLINDADA CONTRA ERRORES DE LLAVE)
 def obtener_dolar_bcra():
     fallback_val = 1414.02
     fallback_fecha = "20/03/2026"
@@ -21,18 +21,17 @@ def obtener_dolar_bcra():
             datos = response.json()
             if 'results' in datos and len(datos['results']) > 0:
                 ultimo = datos['results'][-1]
-                # Verificamos que la llave 'valor' exista para evitar el error previo
                 if 'valor' in ultimo:
                     return float(ultimo['valor']), ultimo.get('fecha', fallback_fecha), "Conexión Exitosa"
                 else:
-                    return fallback_val, fallback_fecha, "BCRA: Dato no disponible aún"
+                    return fallback_val, fallback_fecha, "BCRA: Dato no disponible"
             else:
                 return fallback_val, fallback_fecha, "BCRA: Sin datos para hoy"
-    except Exception as e:
-        return fallback_val, fallback_fecha, f"BCRA: Error de conexión"
+    except Exception:
+        return fallback_val, fallback_fecha, "BCRA: Error de conexión"
     return fallback_val, fallback_fecha, "BCRA: Error desconocido"
 
-# 2. CONFIGURACIÓN E IDENTIDAD VISUAL (FIX DARK MODE TABLAS)
+# 2. CONFIGURACIÓN E IDENTIDAD VISUAL (BLINDAJE TOTAL CONTRA DARK MODE)
 st.set_page_config(page_title="Simulador Llamedo - Profesional", page_icon="🏠")
 
 if 'mostrar_caso_b' not in st.session_state:
@@ -40,23 +39,38 @@ if 'mostrar_caso_b' not in st.session_state:
 
 st.markdown("""
     <style>
-    /* Fondo e Identidad General */
+    /* 1. Fondo e Identidad General */
     .stApp { background-color: #F9F7F2 !important; }
     h1, h2, h3, label, .stMarkdown p { color: #0B3D2E !important; font-family: 'Georgia', serif; }
     
-    /* Sidebar */
+    /* 2. Barra Lateral (Siempre Verde) */
     [data-testid="stSidebar"] { background-color: #0B3D2E !important; }
     [data-testid="stSidebar"] label, [data-testid="stSidebar"] .stCaption, [data-testid="stSidebar"] p { color: white !important; }
-    [data-testid="stSidebar"] input { color: #0B3D2E !important; background-color: white !important; }
+    
+    /* 3. BLINDAJE DE INPUTS (Para que no desaparezca el valor del dólar) */
+    input { 
+        color: #0B3D2E !important; 
+        background-color: white !important; 
+        -webkit-text-fill-color: #0B3D2E !important; 
+    }
+    /* Asegura que incluso deshabilitado se vea oscuro */
+    input:disabled { 
+        opacity: 1 !important; 
+        -webkit-text-fill-color: #0B3D2E !important; 
+    }
 
-    /* FIX PARA TABLAS EN DARK MODE */
+    /* 4. BLINDAJE DE MÉTRICAS (Para que no desaparezca el Neto a Recibir) */
+    [data-testid="stMetricValue"] > div { color: #0B3D2E !important; }
+    [data-testid="stMetricLabel"] > div { color: #0B3D2E !important; }
+    
+    /* 5. Tablas de Desglose */
     [data-testid="stTable"] { background-color: white !important; border-radius: 8px; }
     [data-testid="stTable"] td, [data-testid="stTable"] th { 
         color: #0B3D2E !important; 
         background-color: white !important; 
     }
     
-    /* Botones y Métricas */
+    /* 6. Botones */
     .stButton>button { background-color: #0B3D2E; color: white !important; border-radius: 4px; font-weight: bold; }
     .stMetric { background-color: #ffffff; border-left: 5px solid #0B3D2E; padding: 20px; border-radius: 8px; border: 1px solid #E0DED7; }
     </style>
@@ -82,7 +96,7 @@ def calcular_operacion(p_real, p_esc, com_pct, esc_pct, tipo, tc, mni):
         'total_gastos': comision + iva_com + hono_esc + iva_esc + sellos_parte_usd
     }
 
-# 4. DISCLAIMER LEGAL EN CADA HOJA
+# 4. DISCLAIMER LEGAL EN CADA HOJA DEL PDF
 def agregar_disclaimer(pdf):
     pdf.set_y(250)
     pdf.set_font("Helvetica", "B", 8)
@@ -91,7 +105,7 @@ def agregar_disclaimer(pdf):
     pdf.set_font("Helvetica", "I", 7)
     pdf.multi_cell(0, 3, txt="Esta simulación se emite con fines orientativos. Los valores definitivos surgirán de las proformas oficiales de los escribanos y liquidaciones de impuestos vigentes al momento de la firma.", align="C")
 
-# 5. GENERACIÓN DE PDF
+# 5. GENERACIÓN DE PDF MULTI-PÁGINA
 def generar_pdf_comparativo(casos, tc, mni_val):
     pdf = FPDF()
     for caso in casos:
@@ -145,7 +159,7 @@ with st.sidebar:
     tc = st.number_input("Valor USD", value=val_bcra, disabled=(fuente=="Oficial BCRA"))
     mni = st.number_input("Tope Sellos CABA (ARS)", value=226100000)
 
-# --- ESCENARIO A ---
+# ESCENARIO A
 st.header("📍 Escenario A")
 dir_a = st.text_input("Dirección (A)", "Propiedad Ejemplo")
 col_a1, col_a2 = st.columns(2)
@@ -160,13 +174,9 @@ res_a = calcular_operacion(p_real_a, p_esc_a, com_a, esc_a, tipo_a, tc, mni)
 final_a = (p_real_a - res_a['total_gastos']) if rol_a == "Vendedor" else (p_real_a + res_a['total_gastos'])
 
 with st.expander("🔍 Ver desglose Escenario A", expanded=True):
-    st.table({
-        "Concepto": ["Comisión", "IVA Com.", "Escribanía", "IVA Esc.", "Sellos (50%)"],
-        "Monto USD": [f"{res_a['comision']:,.2f}", f"{res_a['iva_com']:,.2f}", f"{res_a['hono_esc']:,.2f}", f"{res_a['iva_esc']:,.2f}", f"{res_a['sellos']:,.2f}"]
-    })
+    st.table({"Concepto": ["Comisión", "IVA Com.", "Escribanía", "IVA Esc.", "Sellos (50%)"], "USD": [f"{res_a['comision']:,.2f}", f"{res_a['iva_com']:,.2f}", f"{res_a['hono_esc']:,.2f}", f"{res_a['iva_esc']:,.2f}", f"{res_a['sellos']:,.2f}"]})
     st.metric(f"Neto A", f"USD {final_a:,.2f}")
 
-# --- ESCENARIO B ---
 if not st.session_state.mostrar_caso_b:
     if st.button("➕ Comparar con Escenario B"):
         st.session_state.mostrar_caso_b = True; st.rerun()
@@ -189,11 +199,8 @@ if st.session_state.mostrar_caso_b:
     lista_casos.append({'nombre': 'B', 'rol': rol_b, 'p_real': p_real_b, 'p_esc': p_esc_b, 'tipo': tipo_b, 'direccion': dir_b, 'com_pct': com_b, 'esc_pct': esc_b, 'res': res_b})
     
     with st.expander("🔍 Ver desglose Escenario B", expanded=True):
-        st.table({
-            "Concepto": ["Comisión", "IVA Com.", "Escribanía", "IVA Esc.", "Sellos (50%)"],
-            "Monto USD": [f"{res_b['comision']:,.2f}", f"{res_b['iva_com']:,.2f}", f"{res_b['hono_esc']:,.2f}", f"{res_b['iva_esc']:,.2f}", f"{res_b['sellos']:,.2f}"]
-        })
-        st.metric(f"Neto B", f"USD {final_b:,.2f}")
+        st.table({"Concepto": ["Comisión", "IVA Com.", "Escribanía", "IVA Esc.", "Sellos (50%)"], "USD": [f"{res_b['comision']:,.2f}", f"{res_b['iva_com']:,.2f}", f"{res_b['hono_esc']:,.2f}", f"{res_b['iva_esc']:,.2f}", f"{res_b['sellos']:,.2f}"]})
+        st.metric("Neto B", f"USD {final_b:,.2f}")
     if st.button("🗑️ Eliminar Escenario B"):
         st.session_state.mostrar_caso_b = False; st.rerun()
 
